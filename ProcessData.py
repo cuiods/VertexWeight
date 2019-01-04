@@ -3,6 +3,9 @@ import re
 import numpy as np
 import json
 import codecs
+import socket
+import time
+import msgpack
 
 
 def read_data(normal_path, tag_path):
@@ -36,5 +39,27 @@ def generate_skyline_data(normal_path,index):
               codecs.open("data"+str(index)+".json", 'w', encoding='utf-8'))
 
 
+def transfer_skyline_data(path, index, ip, port):
+    normal = read_single_data(path)
+    data = normal[:, index]
+    num = data.shape[0]
+    timestamp = normal[:, index]
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    address = (ip, port)
+    start_time = float(int(time.time() - num))
+    print "Analysis start at " + str(start_time)
+    map_relation = []
+    metric = "power.test.index" + str(index)
+    for i in range(num):
+        data_udp = [start_time, data[i]]
+        packet = msgpack.packb((metric, data_udp))
+        client_socket.sendto(packet, address)
+        map_relation.append([timestamp[i], start_time])
+        start_time = start_time + 1
+    json.dump({"relation": map_relation},
+              codecs.open("time_relation_" + str(index) + ".json", 'w', encoding='utf-8'))
+
+
 if __name__ == "__main__":
-    generate_skyline_data('data/s7_1.txt', 2)
+    # generate_skyline_data('data/s7_1.txt', 2)
+    transfer_skyline_data('data/s7.txt', 2, '127.0.0.1', 2025)
