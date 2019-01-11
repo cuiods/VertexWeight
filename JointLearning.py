@@ -1,10 +1,13 @@
 import numpy as np
+import pandas as pd
 
 
 def calculate_F(lambda_value, U, Y, Du, De, H, W):
     theta_u = calculate_theta_u(Du, H, W, De)
     F = lambda_value * (reciprocal(U.T - U.T.dot(theta_u).dot(U) + (lambda_value*U.T).dot(U)))\
         .dot(U.T).dot(U).dot(Y)
+    F[F > 0.5] = 1
+    F[F < 0.5] = 0
     return F
 
 
@@ -31,17 +34,20 @@ def calculate_theta_u(Du, H, W, De):
 
 
 def reciprocal(matrix):
-    matrix = np.reciprocal(matrix)
-    matrix[matrix == np.inf] = 0
-    return matrix
+    c_matrix = np.reciprocal(matrix)
+    c_matrix[np.abs(c_matrix) == np.inf] = 0
+    c_matrix = pd.DataFrame(c_matrix).fillna(0).values
+    return c_matrix
 
 
 def joint_learning(lambda_value, U, Y, Du, De, H, W, mu):
     F = calculate_F(lambda_value, U, Y, Du, De, H, W)
     U = calculate_U(lambda_value, F, Y, Du, De, H, W, mu)
     cost = calculate_cost(lambda_value, F, U,  Y, Du, De, H, W, mu)
+    print cost
     while True:
         F = calculate_F(lambda_value, U, Y, Du, De, H, W)
+        print F[np.nonzero(F)[0]]
         U = calculate_U(lambda_value, F, Y, Du, De, H, W, mu)
         current_cost = calculate_cost(lambda_value, F, U,  Y, Du, De, H, W, mu)
         print current_cost - cost

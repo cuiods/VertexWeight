@@ -5,6 +5,7 @@ import numpy as np
 import JointLearning as learn
 from sklearn.ensemble import IsolationForest
 from sklearn.cluster import KMeans
+import ProcessData
 
 
 def init_hyper_edge(sample, k):
@@ -60,13 +61,12 @@ def init_hyper_graph(sample, k, W, U, alpha=1):
     :param alpha: alpha value used to calculate H
     :return: H, Du, De
     """
-    distances = euclidean_distances(sample, sample)
-    mean_d = np.mean(distances[distances.nonzero()])
     num = sample.shape[0]
     H = np.zeros((num, num))
     Du = np.zeros((num, num))
     De = np.zeros((num, num))
     edge, edge_distance = init_hyper_edge(sample, k)
+    mean_d = np.mean(edge_distance)
     for i in range(num):
         d_i = edge_distance[i, :].transpose()
         H[edge[i, :], i] = np.exp(- d_i * d_i * 1.0 / (alpha * mean_d * mean_d))
@@ -90,7 +90,7 @@ def classify_abnormal_data(abnormal_data, k):
     return k_means.cluster_centers_
 
 
-def init_vertex_weight(sample_data, centers, gamma):
+def init_vertex_weight(sample_data, centers, eta, gamma=0.5):
     """
     The samples with TS > gamma are set as potential anomalies,
     and gamma is the average score of observed anomalies.
@@ -101,7 +101,7 @@ def init_vertex_weight(sample_data, centers, gamma):
     :param gamma: average score of observed anomalies
     :return: hypergraph vertex weight
     """
-    TS = calculate_vertex_score(sample_data, centers, gamma)
+    TS = calculate_vertex_score(sample_data, centers, eta)
     U = np.zeros((TS.shape[0], 1))
     abnormal_index = np.nonzero(TS > gamma)[0]
     normal_index = np.nonzero(TS <= gamma)[0]
@@ -123,30 +123,37 @@ def calculate_vertex_score(samples, center, eta):
     clf.fit(samples)
     num = samples.shape [0]
     IS = (0.5 - clf.decision_function(samples)).reshape((num, 1))
-    distance = np.min(euclidean_distances(samples, center), axis=1)
+    distance = np.array(np.min(euclidean_distances(samples, center), axis=1))
+    dis_min = np.min(distance)
+    dis_max = np.max(distance)
+    distance = (distance - dis_min) / (dis_max - dis_min)
     SS = np.exp(-distance).reshape((num, 1))
     TS = eta * IS + (1 - eta) * SS
     return TS
 
 
 if __name__ == '__main__':
-    x, y = np.mgrid[0:5, 2:8]
-    sample_data = np.array(zip(x.ravel(), y.ravel()))
-    sample_num= sample_data.shape[0]
-    x, y = np.mgrid[0:2, 2:4]
-    abnormal = np.array(zip(x.ravel(), y.ravel()))
+    origin_data = ProcessData.read_single_data("data/s7_1.txt")[::100, :]
+    print origin_data.shape
+    sample_data = origin_data[:, 1:]
+    sample_num = sample_data.shape[0]
+    abnormal_index = np.array(np.nonzero(origin_data[:, 0] == 0))
+    sample_abnormal_index = abnormal_index[::2, :]
+    abnormal = sample_data[sample_abnormal_index[0]]
 
-    k_abnormal = 4
+    k_abnormal = 5
     centers = classify_abnormal_data(abnormal, k_abnormal)
     ts_abnormal = calculate_vertex_score(abnormal, centers, 0.5)
     abnormal_mean = np.mean(ts_abnormal)
     U = init_vertex_weight(sample_data, centers, abnormal_mean)
-    W = np.zeros((sample_num, 1)) + 1.0 / sample_num
-    H, Du, De = init_hyper_graph(sample_data, 4, W, U, 1)
+
+    W = np.zeros((sample_num, 1)) + 0.5
+    H, Du, De = init_hyper_graph(sample_data, 5, W, U)
 
     lambda_value = 0.5
     mu = 0.5
     Y = np.ones((sample_num, k_abnormal)) - 0.5
+    Y[sample_abnormal_index[0]] = 1
     W_d = np.zeros((sample_num, sample_num))
     U_d = np.zeros((sample_num, sample_num))
     np.fill_diagonal(W_d, W)

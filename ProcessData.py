@@ -32,9 +32,10 @@ def generate_skyline_data(normal_path,index):
     time_index = 1
     timestamp1 = normal[:, time_index]
     data = normal[:, index]
+    print data.shape
     json.dump({"results": np.vstack((timestamp1, data)).T.tolist()},
-              codecs.open("data"+str(index)+".json", 'w', encoding='utf-8'))
+              codecs.open("data"+str(index)+"_tag.json", 'w', encoding='utf-8'))
 
 
 if __name__ == "__main__":
-    generate_skyline_data('data/s7_1.txt', 2)
+    generate_skyline_data('data/s7_1.txt', 6)
