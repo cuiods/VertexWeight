@@ -86,8 +86,8 @@ def classify_abnormal_data(abnormal_data, k):
     :return: centers
     """
     k_means = KMeans(n_clusters=k)
-    k_means.fit(abnormal_data)
-    return k_means.cluster_centers_
+    result = k_means.fit_predict(abnormal_data)
+    return k_means.cluster_centers_, result
 
 
 def init_vertex_weight(sample_data, centers, eta, gamma=0.5):
@@ -134,15 +134,19 @@ def calculate_vertex_score(samples, center, eta):
 
 if __name__ == '__main__':
     origin_data = ProcessData.read_single_data("data/s7_1.txt")[::100, :]
+    # origin_data = ProcessData.read_single_data("data/newcm1dd2.txt")
     print origin_data.shape
+    # sample_data = origin_data[:, :-1]
     sample_data = origin_data[:, 1:]
+    sample_data = sample_data / np.max(sample_data, axis = 0)
     sample_num = sample_data.shape[0]
-    abnormal_index = np.array(np.nonzero(origin_data[:, 0] == 0))
-    sample_abnormal_index = abnormal_index[::2, :]
+    # abnormal_index = np.array(np.nonzero(origin_data[:, -1] == 1))
+    abnormal_index = np.array(np.nonzero(origin_data[:, 0] == 1))
+    sample_abnormal_index = abnormal_index[:, ::3]
     abnormal = sample_data[sample_abnormal_index[0]]
 
     k_abnormal = 5
-    centers = classify_abnormal_data(abnormal, k_abnormal)
+    centers, result = classify_abnormal_data(abnormal, k_abnormal)
     ts_abnormal = calculate_vertex_score(abnormal, centers, 0.5)
     abnormal_mean = np.mean(ts_abnormal)
     U = init_vertex_weight(sample_data, centers, abnormal_mean)
@@ -150,14 +154,28 @@ if __name__ == '__main__':
     W = np.zeros((sample_num, 1)) + 0.5
     H, Du, De = init_hyper_graph(sample_data, 5, W, U)
 
-    lambda_value = 0.5
+    lambda_value = 2
     mu = 0.5
     Y = np.ones((sample_num, k_abnormal)) - 0.5
-    Y[sample_abnormal_index[0]] = 1
+    for i in range(sample_abnormal_index[0].shape[0]):
+        Y[sample_abnormal_index[0][i]] = 0
+        Y[sample_abnormal_index[0][i], result[i]] = 1
     W_d = np.zeros((sample_num, sample_num))
     U_d = np.zeros((sample_num, sample_num))
     np.fill_diagonal(W_d, W)
     np.fill_diagonal(U_d, U)
 
-    F = learn.joint_learning(lambda_value, U_d, Y, Du, De, H, W_d, mu)
-    print F
+    U = U_d
+    W = W_d
+    # F = learn.joint_learning(lambda_value, U_d, Y, Du, De, H, W_d, mu)
+
+    F = learn.calculate_F(lambda_value, U, Y, Du, De, H, W)
+    cost = learn.calculate_cost(lambda_value, F, U, Y, Du, De, H, W, mu)
+
+    F[F > 0.5] = 1
+    F[F <= 0.5] = 0
+    F = np.sum(F, axis=1)
+    F[F > 0] = 1
+    true_tag = origin_data[:, 0]
+    # true_tag[true_tag < 0] = 0
+    print sum(F == true_tag)*1.0 / sample_num
