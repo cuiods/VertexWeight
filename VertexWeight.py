@@ -142,7 +142,9 @@ if __name__ == '__main__':
     sample_num = sample_data.shape[0]
     # abnormal_index = np.array(np.nonzero(origin_data[:, -1] == 1))
     abnormal_index = np.array(np.nonzero(origin_data[:, 0] == 1))
-    sample_abnormal_index = abnormal_index[:, ::3]
+    sample_abnormal_index = abnormal_index[:, ::2]
+    normal_index = np.array(np.nonzero(origin_data[:, 0] == 0))
+    sample_normal_index = normal_index[:, ::2]
     abnormal = sample_data[sample_abnormal_index[0]]
 
     k_abnormal = 5
@@ -160,6 +162,8 @@ if __name__ == '__main__':
     for i in range(sample_abnormal_index[0].shape[0]):
         Y[sample_abnormal_index[0][i]] = 0
         Y[sample_abnormal_index[0][i], result[i]] = 1
+    for i in range(sample_normal_index[0].shape[0]):
+        Y[sample_normal_index[0][i]] = 0
     W_d = np.zeros((sample_num, sample_num))
     U_d = np.zeros((sample_num, sample_num))
     np.fill_diagonal(W_d, W)
