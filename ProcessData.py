@@ -1,28 +1,36 @@
 import pandas as pd
 import re
 import numpy as np
-import json
-import codecs
-import socket
-import time
-import msgpack
-
-
-def read_data(normal_path, tag_path):
-    normal = pd.read_csv(normal_path, header=None)
-    abnormal = pd.read_csv(tag_path, header=None)
-    normal = filter_data(normal)
-    abnormal = filter_data(abnormal)
-    return normal.values, abnormal.values
 
 
 def read_single_data(path):
+    """
+    Read data in ndarray type
+    :param path: path of data file
+    :return:  data: ndarray
+    """
     normal = pd.read_csv(path, header=None)
     normal = filter_data(normal)
     return normal.values
 
 
+def read_origin_data(path):
+    """
+    Read data in data frame type
+    :param path:  path of data file
+    :return: data: ndarray
+    """
+    normal = pd.read_csv(path, header=None)
+    normal = filter_data(normal)
+    return normal
+
+
 def filter_data(data_frame):
+    """
+    Process string value
+    :param data_frame: raw data in data frame type
+    :return: data frame
+    """
     data_frame[data_frame.columns[len(data_frame.columns) - 2]] = \
         data_frame[data_frame.columns[len(data_frame.columns) - 2]].apply(lambda x: int("".join(re.findall(r'\d+', x))))
     data_frame[data_frame.columns[len(data_frame.columns) - 1]] = \
@@ -30,37 +38,33 @@ def filter_data(data_frame):
     return data_frame
 
 
-def generate_skyline_data(normal_path,index):
-    normal = read_single_data(normal_path)
-    time_index = 1
-    timestamp1 = normal[:, time_index]
-    data = normal[:, index]
-    print data.shape
-    json.dump({"results": np.vstack((timestamp1, data)).T.tolist()},
-              codecs.open("data"+str(index)+"_tag.json", 'w', encoding='utf-8'))
+def preprocess(path, sample_bound=-1, abnormal_bound=-1, normal_bound=-1):
+    """
+    Complete data preprocess.
+    :param path:  data path
+    :param sample_bound:  max sample num
+    :param abnormal_bound:  max abnormal tag num
+    :param normal_bound:  max normal tag num
+    :return: origin_data, sample_data, abnormal_index, normal_index, abnormal_data
+    """
+    origin_data = read_origin_data(path)
+    if sample_bound > 0:
+        origin_data = origin_data.sample(n=sample_bound)
+    origin_data = origin_data.values
 
+    # define specific sample data
+    sample_data = origin_data[:, 1:]
+    sample_data = sample_data / np.max(sample_data, axis=0)
+    abnormal_index = np.array(np.nonzero(origin_data[:, 0] == 1))
+    normal_index = np.array(np.nonzero(origin_data[:, 0] == 0))
 
-def transfer_skyline_data(path, index, ip, port):
-    normal = read_single_data(path)
-    data = normal[:, index]
-    num = data.shape[0]
-    timestamp = normal[:, index]
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    address = (ip, port)
-    start_time = float(int(time.time() - num))
-    print "Analysis start at " + str(start_time)
-    map_relation = []
-    metric = "power.test.index" + str(index)
-    for i in range(num):
-        data_udp = [start_time, data[i]]
-        packet = msgpack.packb((metric, data_udp))
-        client_socket.sendto(packet, address)
-        map_relation.append([timestamp[i], start_time])
-        start_time = start_time + 1
-    json.dump({"relation": map_relation},
-              codecs.open("time_relation_" + str(index) + ".json", 'w', encoding='utf-8'))
+    if (abnormal_bound > 0) and (abnormal_bound < abnormal_index.shape[1]):
+        idx = np.random.randint(abnormal_index.shape[1], size=abnormal_bound)
+        abnormal_index = abnormal_index[:, idx]
+    if (normal_bound > 0) and (normal_bound < normal_index.shape[1]):
+        idx = np.random.randint(normal_index.shape[1], size=normal_bound)
+        normal_index = normal_index[:, idx]
 
+    abnormal = sample_data[abnormal_index[0]]
 
-if __name__ == "__main__":
-    # generate_skyline_data('data/s7_1.txt', 2)
-    transfer_skyline_data('data/s7.txt', 2, '127.0.0.1', 2025)
+    return origin_data, sample_data, abnormal_index, normal_index, abnormal

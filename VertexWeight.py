@@ -2,10 +2,8 @@
 
 from scipy.spatial import KDTree
 import numpy as np
-import JointLearning as learn
 from sklearn.ensemble import IsolationForest
 from sklearn.cluster import KMeans
-import ProcessData
 
 
 def init_hyper_edge(sample, k):
@@ -131,55 +129,3 @@ def calculate_vertex_score(samples, center, eta):
     TS = eta * IS + (1 - eta) * SS
     return TS
 
-
-if __name__ == '__main__':
-    origin_data = ProcessData.read_single_data("data/s7_1.txt")[::100, :]
-    # origin_data = ProcessData.read_single_data("data/newcm1dd2.txt")
-    print origin_data.shape
-    # sample_data = origin_data[:, :-1]
-    sample_data = origin_data[:, 1:]
-    sample_data = sample_data / np.max(sample_data, axis = 0)
-    sample_num = sample_data.shape[0]
-    # abnormal_index = np.array(np.nonzero(origin_data[:, -1] == 1))
-    abnormal_index = np.array(np.nonzero(origin_data[:, 0] == 1))
-    sample_abnormal_index = abnormal_index[:, ::2]
-    normal_index = np.array(np.nonzero(origin_data[:, 0] == 0))
-    sample_normal_index = normal_index[:, ::2]
-    abnormal = sample_data[sample_abnormal_index[0]]
-
-    k_abnormal = 5
-    centers, result = classify_abnormal_data(abnormal, k_abnormal)
-    ts_abnormal = calculate_vertex_score(abnormal, centers, 0.5)
-    abnormal_mean = np.mean(ts_abnormal)
-    U = init_vertex_weight(sample_data, centers, abnormal_mean)
-
-    W = np.zeros((sample_num, 1)) + 0.5
-    H, Du, De = init_hyper_graph(sample_data, 5, W, U)
-
-    lambda_value = 2
-    mu = 0.5
-    Y = np.ones((sample_num, k_abnormal)) - 0.5
-    for i in range(sample_abnormal_index[0].shape[0]):
-        Y[sample_abnormal_index[0][i]] = 0
-        Y[sample_abnormal_index[0][i], result[i]] = 1
-    for i in range(sample_normal_index[0].shape[0]):
-        Y[sample_normal_index[0][i]] = 0
-    W_d = np.zeros((sample_num, sample_num))
-    U_d = np.zeros((sample_num, sample_num))
-    np.fill_diagonal(W_d, W)
-    np.fill_diagonal(U_d, U)
-
-    U = U_d
-    W = W_d
-    # F = learn.joint_learning(lambda_value, U_d, Y, Du, De, H, W_d, mu)
-
-    F = learn.calculate_F(lambda_value, U, Y, Du, De, H, W)
-    cost = learn.calculate_cost(lambda_value, F, U, Y, Du, De, H, W, mu)
-
-    F[F > 0.5] = 1
-    F[F <= 0.5] = 0
-    F = np.sum(F, axis=1)
-    F[F > 0] = 1
-    true_tag = origin_data[:, 0]
-    # true_tag[true_tag < 0] = 0
-    print sum(F == true_tag)*1.0 / sample_num
