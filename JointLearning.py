@@ -98,7 +98,7 @@ def reciprocal(matrix):
     return c_matrix
 
 
-def joint_learning(lambda_value, learning_rate, U, Y, Du, De, H, W, mu):
+def joint_learning(lambda_value, learning_rate, U, Y, Du, De, H, W, mu, joint=False):
     """
     Joint Learning on Vertex Relevance and Vertex Weights
 
@@ -115,16 +115,17 @@ def joint_learning(lambda_value, learning_rate, U, Y, Du, De, H, W, mu):
     """
     F = calculate_F(lambda_value, U, Y, Du, De, H, W)
     cost = calculate_cost(lambda_value, F, U, Y, Du, De, H, W, mu)
-    # print cost
-    # U = calculate_U_gradient(lambda_value, learning_rate, F, U, Y, Du, De, H, W, mu)
-    # cost = calculate_cost(lambda_value, F, U,  Y, Du, De, H, W, mu)
-    # print cost
-    # while True:
-    #     F = calculate_F(lambda_value, U, Y, Du, De, H, W)
-    #     U = calculate_U_gradient(lambda_value, learning_rate, F, U, Y, Du, De, H, W, mu)
-    #     current_cost = calculate_cost(lambda_value, F, U,  Y, Du, De, H, W, mu)
-    #     print current_cost
-    #     if cost - current_cost < 1:
-    #         break
-    #     cost = current_cost
+    if joint:
+        print cost
+        U = calculate_U_gradient(lambda_value, learning_rate, F, U, Y, Du, De, H, W, mu)
+        cost = calculate_cost(lambda_value, F, U, Y, Du, De, H, W, mu)
+        print cost
+        while True:
+            F = calculate_F(lambda_value, U, Y, Du, De, H, W)
+            U = calculate_U_gradient(lambda_value, learning_rate, F, U, Y, Du, De, H, W, mu)
+            current_cost = calculate_cost(lambda_value, F, U, Y, Du, De, H, W, mu)
+            print current_cost
+            if cost - current_cost < 1:
+                break
+            cost = current_cost
     return F

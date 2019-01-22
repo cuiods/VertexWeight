@@ -105,7 +105,7 @@ def init_vertex_weight(sample_data, centers, eta, gamma=0.5):
     normal_index = np.nonzero(TS <= gamma)[0]
     U[abnormal_index] = TS[abnormal_index] / np.max(TS)
     U[normal_index] = (np.max(TS) - TS[normal_index]) / (np.max(TS) - np.min(TS))
-    return U
+    return U, abnormal_index, normal_index
 
 
 def calculate_vertex_score(samples, center, eta):

@@ -38,7 +38,7 @@ def filter_data(data_frame):
     return data_frame
 
 
-def preprocess(path, sample_bound=-1, abnormal_bound=-1, normal_bound=-1):
+def preprocess(path, sample_bound=-1, abnormal_bound=-1, normal_bound=-1, abnormal_rate = 0.5):
     """
     Complete data preprocess.
     :param path:  data path
@@ -48,13 +48,17 @@ def preprocess(path, sample_bound=-1, abnormal_bound=-1, normal_bound=-1):
     :return: origin_data, sample_data, abnormal_index, normal_index, abnormal_data
     """
     origin_data = read_origin_data(path)
+    normal_origin_data = origin_data[origin_data[0] == 0]
+    abnormal_origin_data = origin_data[origin_data[0] == 1]
     if sample_bound > 0:
-        origin_data = origin_data.sample(n=sample_bound)
+        abnormal_sample_data = abnormal_origin_data.sample(n=int(sample_bound*abnormal_rate))
+        normal_sample_data = normal_origin_data.sample(n=int(sample_bound*(1-abnormal_rate)))
+        origin_data = pd.concat([abnormal_sample_data, normal_sample_data])
     origin_data = origin_data.values
 
     # define specific sample data
     sample_data = origin_data[:, 1:]
-    sample_data = sample_data / np.max(sample_data, axis=0)
+    sample_data = (sample_data - np.min(sample_data, axis=0)) / (np.max(sample_data, axis=0)-np.min(sample_data, axis=0))
     abnormal_index = np.array(np.nonzero(origin_data[:, 0] == 1))
     normal_index = np.array(np.nonzero(origin_data[:, 0] == 0))
 
