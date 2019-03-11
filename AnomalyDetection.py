@@ -2,6 +2,7 @@ import ProcessData as data
 import VertexWeight as graph
 import JointLearning as learn
 import numpy as np
+import sys
 
 '''
 CAN CHANGE
@@ -30,11 +31,15 @@ USE_ABNORMAL = 1
 # whether tag normal data
 USE_NORMAL = 0
 
+# whether use learning
+USE_LEARNING = 0
+
 # whether use joint learning
 USE_JOINT_LEARNING = 0
 
-SAMPLE_BOUND = 5000
-ABNORMAL_BOUND = 25
+ABNORMAL_RATE = 0.5
+SAMPLE_BOUND = 10000
+ABNORMAL_BOUND = 750
 NORMAL_BOUND = 1250
 
 '''
@@ -43,7 +48,7 @@ CANNOT CHANGE
 UNKNOWN_TAG = 0.5
 ABNORMAL_TAG = 1
 NORMAL_TAG = 0
-
+sys.setrecursionlimit(10000)
 
 def init_detection_tag(sample_num, sample_abnormal_index, sample_normal_index, abnormal_result):
     """
@@ -90,6 +95,20 @@ def init_hyper_graph(sample_data, abnormal_data, abnormal_centers):
     return U, Du, De, H, W, abnormal_index, normal_index
 
 
+def init_hyper_graph_quick(sample_data, abnormal_data, abnormal_centers):
+    """
+    Init hyper graph with vertex weight
+
+    :param sample_data: sample
+    :param abnormal_data: abnormal data
+    :param abnormal_centers: abnormal cluster center
+    :return: U, Du, De, H, W of graph
+    """
+    anomaly_mean_score = np.mean(graph.calculate_vertex_score(abnormal_data, abnormal_centers, ETA))
+    U, abnormal_index, normal_index = graph.init_vertex_weight(sample_data, abnormal_centers, ETA, anomaly_mean_score)
+    return U, abnormal_index, normal_index
+
+
 def measure_result(F, origin_data):
     """
     Result measurement
@@ -123,20 +142,29 @@ def anomaly_detection(path):
     :return:
     """
     origin_data, sample_data, sample_abnormal_index, sample_normal_index, abnormal \
-        = data.preprocess(path, sample_bound=SAMPLE_BOUND, abnormal_bound=ABNORMAL_BOUND, normal_bound=NORMAL_BOUND, abnormal_rate=0.5)
+        = data.preprocess(path, sample_bound=SAMPLE_BOUND, abnormal_bound=ABNORMAL_BOUND, normal_bound=NORMAL_BOUND, abnormal_rate=ABNORMAL_RATE)
     sample_num = sample_data.shape[0]
 
     centers, result = graph.classify_abnormal_data(abnormal, K_ABNORMAL)
     Y = init_detection_tag(sample_num, sample_abnormal_index, sample_normal_index, result)
 
-    U, Du, De, H, W, first_abnormal, first_normal = init_hyper_graph(sample_data, abnormal, centers)
+    if USE_LEARNING:
+        U, Du, De, H, W, first_abnormal, first_normal = init_hyper_graph(sample_data, abnormal, centers)
+    else:
+        U, first_abnormal, first_normal = init_hyper_graph_quick(sample_data, abnormal, centers)
+
     true_tag = origin_data[:, 0]
     true_data_index = np.nonzero(true_tag > 0)[0].tolist()
     false_data_index = np.nonzero(true_tag <= 0)[0].tolist()
     tp = set(first_abnormal).intersection(set(true_data_index))
     tn = set(first_normal).intersection(set(false_data_index))
-    print len(tp)
-    print len(tn)
+
+    fp = set(first_abnormal).intersection(set(false_data_index))
+    if len(fp) > 0:
+        fp_array = origin_data[list(fp), :]
+        fp_array = fp_array[fp_array[:, 1].argsort()]
+        np.savetxt("fp_data.txt", fp_array, delimiter=",")
+
     accuracy = (len(tp)+len(tn)) * 1.0 / true_tag.shape[0]
     abnormal_precision = len(tp) * 1.0 / len(first_abnormal)
     abnormal_recall = len(tp) * 1.0 / len(true_data_index)
@@ -146,10 +174,10 @@ def anomaly_detection(path):
     print 'First Abnormal recall:' + str(abnormal_recall)
     print 'First F value:' + str(f_value)
 
-    # F = learn.joint_learning(LAMBDA, LEARNING_RATE, U, Y, Du, De, H, W, MU, joint=USE_JOINT_LEARNING)
-    #
-    # measure_result(F, origin_data)
+    if USE_LEARNING:
+        F = learn.joint_learning(LAMBDA, LEARNING_RATE, U, Y, Du, De, H, W, MU, joint=USE_JOINT_LEARNING)
+        measure_result(F, origin_data)
 
 
 if __name__ == '__main__':
-    anomaly_detection("data/s7_1.txt")
+    anomaly_detection("data/data_ipv6_old.csv")

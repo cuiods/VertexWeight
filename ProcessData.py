@@ -21,7 +21,7 @@ def read_origin_data(path):
     :return: data: ndarray
     """
     normal = pd.read_csv(path, header=None)
-    normal = filter_data(normal)
+    # normal = filter_data(normal)
     return normal
 
 
@@ -57,8 +57,9 @@ def preprocess(path, sample_bound=-1, abnormal_bound=-1, normal_bound=-1, abnorm
     origin_data = origin_data.values
 
     # define specific sample data
-    sample_data = origin_data[:, 1:]
+    sample_data = origin_data[:, 2:]
     sample_data = (sample_data - np.min(sample_data, axis=0)) / (np.max(sample_data, axis=0)-np.min(sample_data, axis=0))
+    sample_data = np.nan_to_num(sample_data)
     abnormal_index = np.array(np.nonzero(origin_data[:, 0] == 1))
     normal_index = np.array(np.nonzero(origin_data[:, 0] == 0))
 
